@@ -102,14 +102,25 @@ local function join_path(...)
     return table.concat({...}, seperator)
 end
 
-local source_path, bt_filename, source_filenames  = ...
-local source_files = read_file(source_filenames)
-local all_filename = {}
-for line in source_files:gmatch("(%g+)\n") do
-    table.insert(all_filename, line)
+local source_path, bt_filename = ...
+
+local function extract_source_filename(path)
+    local lines = read_file_in_lines(path)
+    local filename_map = {}
+    for _,line in ipairs(lines) do
+        for debug_info in line:gmatch("([_%w%/:%d .]+);") do
+            for filename in debug_info:gmatch("([%w.%/_]+):%d+") do
+                filename_map[filename] = true
+            end
+        end
+    end
+    return filename_map
 end
+
+local all_filename = extract_source_filename(bt_filename)
+
 local quick_tbl = {}
-for _,filename in ipairs(all_filename) do
+for filename in pairs(all_filename) do
     local path = join_path(source_path, filename)
     local source = read_file(path)
     local ast = parser(source)
