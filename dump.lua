@@ -102,8 +102,8 @@ local function join_path(...)
     return table.concat({...}, seperator)
 end
 
-local source_path = "troy"
-local source_files = read_file("source_files.txt")
+local source_path, bt_filename, source_filenames  = ...
+local source_files = read_file(source_filenames)
 local all_filename = {}
 for line in source_files:gmatch("(%g+)\n") do
     table.insert(all_filename, line)
@@ -118,16 +118,16 @@ for _,filename in ipairs(all_filename) do
 end
 --------------------
 --search symbol
-local flamegraph = read_file_in_lines("a.cbt")
+local flamegraph = read_file_in_lines(bt_filename)
 for _,line in ipairs(flamegraph) do
     local newline = {}
-    local count = line:find("\t(%d+)")
-	for debug_info in line:gmatch("([%w%/:%d .]+);") do
-		local new_debug_info = string.gsub(debug_info, "([%w%/.]+):(%d+)",function(filename, lineno)
+    local count = line:find("  (%d+)")
+	for debug_info in line:gmatch("([%w%/:%d._]+);") do
+		local new_debug_info = string.gsub(debug_info, "([%w%/._]+):(%d+)",function(filename, lineno)
             lineno = tonumber(lineno)
-		    local symbol = quick_tbl[filename]
-			local funcname = symbol[lineno] or 'anonymous'
-            return table.concat({funcname, ':', lineno})
+		    local symbol = assert(quick_tbl[filename], filename)
+			local funcname = symbol[lineno] or debug_info
+            return table.concat({filename, ':', funcname})
 		end)
         table.insert(newline, new_debug_info)
 	end
