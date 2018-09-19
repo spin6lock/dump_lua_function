@@ -1,25 +1,6 @@
 local parser = require "parser"
 local print_r = require "print_r"
 
-local source = [[
-
-function aa()
-    return 33
-end
-
-function ee.cc:ff()
-    return 3
-end
-
-local function foo()
-    return 4
-end
-
-function foo.cc.ee ()
-    return 4
-end
-]]
-
 local function append(ret, name, location, end_location)
     ret[#ret+1] = {
         name = name,
@@ -85,18 +66,70 @@ end
 
 local function read_file(path)
     local fd =io.open(path, "r")
-    assert(fd, path)
+    assert(fd, 'not found:'..path)
     local s = fd:read("a")
     fd:close()
     return s
 end
 
-local path = ...
-local source = read_file(path)
+local function read_file_in_lines(path)
+    local fd = io.open(path, "r")
+    assert(fd, path)
+    local s = {}
+    for line in fd:lines() do
+        table.insert(s, line)
+    end
+    fd:close()
+    return s
+end
 
-local ast = parser(source)
-local info = dump_block(ast, {})
+local function gen_lineno_quick_tbl(info)
+    local ret = {}
+    for _, v in ipairs(info) do
+        local name = v.name
+        local range = v.range
+        local start = range[1]
+        local finish = range[2]
+        for i=start,finish do
+            ret[i] = name
+        end
+    end
+    return ret
+end
 
+local function join_path(...)
+    local seperator = "/"
+    return table.concat({...}, seperator)
+end
 
-print("#############")
-print_r(info)
+local source_path = "troy"
+local source_files = read_file("source_files.txt")
+local all_filename = {}
+for line in source_files:gmatch("(%g+)\n") do
+    table.insert(all_filename, line)
+end
+local quick_tbl = {}
+for _,filename in ipairs(all_filename) do
+    local path = join_path(source_path, filename)
+    local source = read_file(path)
+    local ast = parser(source)
+    local info = dump_block(ast, {})
+    quick_tbl[filename] = gen_lineno_quick_tbl(info)
+end
+--------------------
+--search symbol
+local flamegraph = read_file_in_lines("a.cbt")
+for _,line in ipairs(flamegraph) do
+    local newline = {}
+    local count = line:find("\t(%d+)")
+	for debug_info in line:gmatch("([%w%/:%d .]+);") do
+		local new_debug_info = string.gsub(debug_info, "([%w%/.]+):(%d+)",function(filename, lineno)
+            lineno = tonumber(lineno)
+		    local symbol = quick_tbl[filename]
+			local funcname = symbol[lineno] or 'anonymous'
+            return table.concat({funcname, ':', lineno})
+		end)
+        table.insert(newline, new_debug_info)
+	end
+    print(table.concat(newline, ';').." "..count)
+end 
