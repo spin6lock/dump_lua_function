@@ -132,7 +132,7 @@ end
 local flamegraph = read_file_in_lines(bt_filename)
 for _,line in ipairs(flamegraph) do
     local newline = {}
-    local count = line:find("  (%d+)")
+    local count = line:match("(%d+)$")
 	for debug_info in line:gmatch("([%w%/:%d._]+);") do
 		local new_debug_info = string.gsub(debug_info, "([%w%/._]+):(%d+)",function(filename, lineno)
             lineno = tonumber(lineno)
